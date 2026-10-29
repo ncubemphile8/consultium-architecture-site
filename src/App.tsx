@@ -46,7 +46,7 @@ function Hotspot({ room, onSelect }: { room: Room; onSelect: (room: Room) => voi
 
 function HouseExperience() {
   const [selected, setSelected] = useState<Room | null>(null);
-  const [modelFailed, setModelFailed] = useState(false);
+  const [modelFailed, setModelFailed] = useState(true);
   return <div className="house-stage">
     <Canvas shadows camera={{ position: [5.2, 3.2, 6.5], fov: 40 }} dpr={[1, 1.6]}>
       <color attach="background" args={['#d8d7ce']} />
@@ -95,7 +95,6 @@ export default function App() {
   const [budget, setBudget] = useState('100,000–250,000');
   const [projectType, setProjectType] = useState('New home');
   const [submitted, setSubmitted] = useState(false);
-  const [faqOpen, setFaqOpen] = useState(0);
   const [contactForm, setContactForm] = useState({ name: '', email: '', details: '' });
   const submit = (event: React.FormEvent) => { event.preventDefault(); setSubmitted(true); };
   const mailBody = encodeURIComponent('Hello Consultium,\n\nI would like to discuss a project.\nProject type: ' + projectType + '\nIndicative budget: ' + budget + '\nName: ' + contactForm.name + '\nEmail: ' + contactForm.email + '\nProject details: ' + contactForm.details);
