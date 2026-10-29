@@ -171,7 +171,7 @@ export default function App() {
         <div className="hero-actions"><a className="button button-dark" href="#work">Explore our work <span>↘</span></a><a className="quiet-link" href="#approach">Our approach <span>↗</span></a></div>
       </div>
       <div className="hero-visual">
-        <img src="https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1800&q=90" alt="Contemporary architecture with warm natural materials" />
+        <video className="hero-video" autoPlay muted loop playsInline preload="metadata" poster="https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1800&q=90" aria-label="Architectural concept transforming into a finished contemporary villa"><source src="https://d2ol7oe51mr4n9.cloudfront.net/user_3JlBxAyut4hiS7XHQife3mH61Ba/044c7c29-0233-4a87-967c-c87d0baee3d4.mp4" type="video/mp4" />Your browser does not support embedded video.</video>
         <div className="hero-image-overlay"></div><div className="hero-image-note"><span>FIG. 01</span><span>FORM · LIGHT · LANDSCAPE</span></div>
         <div className="hero-index">01 <i /> 04</div>
       </div>
