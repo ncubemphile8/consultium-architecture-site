@@ -102,8 +102,6 @@ function HouseExperience() {
         title="Interactive Modern Coastal Hillside Villa by Visthétique"
         allow="autoplay; fullscreen; xr-spatial-tracking; clipboard-write"
         allowFullScreen
-        mozallowfullscreen="true"
-        webkitallowfullscreen="true"
         src="about:blank"
       />
       {!ready && !loadError && <div className="viewer-loading"><span className="loading-mark" />Loading the interactive villa…</div>}
