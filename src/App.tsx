@@ -1,81 +1,129 @@
-import { useMemo, useState, Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Environment, OrbitControls, Html, useGLTF, ContactShadows } from '@react-three/drei';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import * as THREE from 'three';
 
-type Room = { id: string; label: string; note: string; position: [number, number, number] };
+type CameraPose = { position: [number, number, number]; target: [number, number, number] };
+type SketchfabApi = {
+  start: () => void;
+  addEventListener: (event: string, callback: (...args: any[]) => void) => void;
+  getCameraLookAt: (callback: (error: unknown, camera: CameraPose | null) => void) => void;
+  setCameraLookAt: (position: [number, number, number], target: [number, number, number], duration?: number, callback?: (error: unknown) => void) => void;
+  setCameraEasing: (easing: string) => void;
+  setUserInteraction: (enabled: boolean, callback?: (error: unknown) => void) => void;
+  recenterCamera: (callback?: (error: unknown) => void) => void;
+};
+declare global {
+  interface Window {
+    Sketchfab?: new (iframe: HTMLIFrameElement) => {
+      init: (uid: string, options: {
+        autostart: number;
+        camera: number;
+        success: (api: SketchfabApi) => void;
+        error: (error: unknown) => void;
+      }) => void;
+    };
+  }
+}
+type Room = { id: string; label: string; note: string; position: [number, number, number]; target: [number, number, number] };
 const rooms: Room[] = [
-  { id: 'living', label: 'Living spaces', note: 'Open, light-filled spaces designed around everyday life.', position: [-1.4, 1.1, 0.8] },
-  { id: 'kitchen', label: 'Kitchen', note: 'A calm material palette, generous light and thoughtful flow.', position: [1.1, 1, 0.5] },
-  { id: 'terrace', label: 'Terrace', note: 'Architecture that opens naturally to its landscape.', position: [0.2, 0.8, 2] },
+  { id: 'living', label: 'Living space', note: 'A closer look at the villa’s open living area and its connection to the landscape.', position: [-4, 53, -28], target: [-19, 45, -47] },
+  { id: 'kitchen', label: 'Kitchen', note: 'Move towards the kitchen zone and its material details.', position: [-39, 53, -53], target: [-54, 45, -71] },
+  { id: 'terrace', label: 'Terrace', note: 'Explore the outdoor dining and terrace setting.', position: [-5, 52, -97], target: [-29, 43, -78] },
+  { id: 'stairs', label: 'Staircase', note: 'Focus on the stair and the vertical connection between spaces.', position: [22, 58, -3], target: [10, 50, -15] },
 ];
 
-function VillaModel() {
-  const { scene } = useGLTF('/models/villa.gltf');
-  const clone = useMemo(() => {
-    const object = scene.clone(true);
-    object.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-      }
-    });
-    return object;
-  }, [scene]);
-  return <primitive object={clone} position={[0, -0.7, 0]} scale={1.15} />;
-}
-
-function ModelFallback() {
-  return <group position={[0, -0.4, 0]}>
-    <mesh castShadow position={[0, 0.5, 0]}><boxGeometry args={[3.6, 1.2, 2.4]} /><meshStandardMaterial color="#d8d2c5" roughness={0.72} /></mesh>
-    <mesh castShadow position={[0, 1.35, 0]} rotation={[0, Math.PI / 4, 0]}><coneGeometry args={[2.35, 1.15, 4]} /><meshStandardMaterial color="#5b6259" roughness={0.8} /></mesh>
-    <mesh position={[0, 0.5, 1.21]}><boxGeometry args={[1.3, 0.85, 0.04]} /><meshStandardMaterial color="#34464b" metalness={0.15} roughness={0.2} /></mesh>
-    <mesh position={[-0.85, 0.5, 1.22]}><boxGeometry args={[0.45, 0.85, 0.04]} /><meshStandardMaterial color="#34464b" roughness={0.2} /></mesh>
-    <mesh position={[0.95, 0.5, 1.22]}><boxGeometry args={[0.45, 0.85, 0.04]} /><meshStandardMaterial color="#34464b" roughness={0.2} /></mesh>
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.12, 0]} receiveShadow><planeGeometry args={[12, 9]} /><meshStandardMaterial color="#b6b2a7" roughness={1} /></mesh>
-  </group>;
-}
-
-function Hotspot({ room, onSelect }: { room: Room; onSelect: (room: Room) => void }) {
-  return <Html position={room.position} center distanceFactor={8}>
-    <button className="hotspot" onClick={(event) => { event.stopPropagation(); onSelect(room); }} aria-label={'Explore ' + room.label}><span />{room.label}</button>
-  </Html>;
-}
-
 function HouseExperience() {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const apiRef = useRef<SketchfabApi | null>(null);
+  const homePoseRef = useRef<CameraPose | null>(null);
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState<Room | null>(null);
-  const [modelFailed, setModelFailed] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    let script = document.querySelector<HTMLScriptElement>('script[data-consultium-sketchfab="true"]');
+    const initialize = () => {
+      if (cancelled || !iframeRef.current || !window.Sketchfab) {
+        if (!cancelled && !window.Sketchfab) setLoadError(true);
+        return;
+      }
+      const client = new window.Sketchfab(iframeRef.current);
+      client.init('7aa1124e2f0a4013a16f61404deb8259', {
+        autostart: 1,
+        camera: 0,
+        success: (api) => {
+          if (cancelled) return;
+          apiRef.current = api;
+          api.setCameraEasing('easeInOutCubic');
+          api.start();
+          api.addEventListener('viewerready', () => {
+            if (cancelled) return;
+            api.getCameraLookAt((error, camera) => {
+              if (!error && camera) homePoseRef.current = camera;
+              setReady(true);
+            });
+          });
+        },
+        error: () => { if (!cancelled) setLoadError(true); },
+      });
+    };
+    if (window.Sketchfab) initialize();
+    else {
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js';
+        script.async = true;
+        script.dataset.consultiumSketchfab = 'true';
+        script.onerror = () => { if (!cancelled) setLoadError(true); };
+        document.head.appendChild(script);
+      }
+      script.addEventListener('load', initialize, { once: true });
+    }
+    return () => { cancelled = true; };
+  }, []);
+
+  const returnOutside = () => {
+    const api = apiRef.current;
+    const home = homePoseRef.current;
+    setSelected(null);
+    if (!api) return;
+    if (home) api.setCameraLookAt(home.position, home.target, 2.2);
+    else api.recenterCamera();
+  };
+  const explore = (room: Room) => {
+    setSelected(room);
+    apiRef.current?.setCameraLookAt(room.position, room.target, 2.8);
+  };
+
   return <div className="house-stage">
-    <Canvas shadows camera={{ position: [5.2, 3.2, 6.5], fov: 40 }} dpr={[1, 1.6]}>
-      <color attach="background" args={['#d8d7ce']} />
-      <ambientLight intensity={1.2} />
-      <directionalLight position={[5, 8, 5]} intensity={2.1} castShadow shadow-mapSize={[1024, 1024]} />
-      <Suspense fallback={null}>
-        {!modelFailed ? <ModelErrorBoundary onFail={() => setModelFailed(true)}><VillaModel /></ModelErrorBoundary> : <ModelFallback />}
-        <Environment preset="city" />
-        <ContactShadows position={[0, -0.18, 0]} opacity={0.35} scale={12} blur={2.5} far={4} />
-        {rooms.map(room => <Hotspot key={room.id} room={room} onSelect={setSelected} />)}
-      </Suspense>
-      <OrbitControls makeDefault enablePan={false} minDistance={4} maxDistance={11} minPolarAngle={0.45} maxPolarAngle={Math.PI / 2.05} />
-    </Canvas>
-    <div className="stage-hint"><span className="hint-dot" /> Drag to explore · Select a marker</div>
+    <div className="viewer-frame">
+      <iframe
+        ref={iframeRef}
+        title="Interactive Modern Coastal Hillside Villa by Visthétique"
+        allow="autoplay; fullscreen; xr-spatial-tracking; clipboard-write"
+        allowFullScreen
+        mozallowfullscreen="true"
+        webkitallowfullscreen="true"
+        src="about:blank"
+      />
+      {!ready && !loadError && <div className="viewer-loading"><span className="loading-mark" />Loading the interactive villa…</div>}
+      {loadError && <div className="viewer-error">The 3D viewer could not load. <a href="https://sketchfab.com/3d-models/modern-coastal-hillside-villa-7aa1124e2f0a4013a16f61404deb8259" target="_blank" rel="noreferrer">Open the villa on Sketchfab ↗</a></div>}
+      <div className="stage-hint"><span className="hint-dot" /> Drag to orbit · use the room controls below</div>
+      <div className="model-caption"><span>01 / MODERN COASTAL HILLSIDE VILLA</span><span>INTERACTIVE 3D</span></div>
+    </div>
+    <div className="room-controls" aria-label="Explore areas of the villa">
+      <button className={!selected ? 'room-control active' : 'room-control'} onClick={returnOutside}><span>00</span> Exterior <i>↗</i></button>
+      {rooms.map((room, index) => <button key={room.id} className={selected?.id === room.id ? 'room-control active' : 'room-control'} onClick={() => explore(room)}><span>{String(index + 1).padStart(2, '0')}</span>{room.label}<i>↗</i></button>)}
+    </div>
     <AnimatePresence>
-      {selected && <motion.div className="room-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }}>
+      {selected && <motion.div className="room-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}>
         <button className="room-close" onClick={() => setSelected(null)} aria-label="Close room details">×</button>
         <p className="eyebrow">EXPLORE THE DESIGN</p><h3>{selected.label}</h3><p>{selected.note}</p>
         <button className="text-link" onClick={() => { setSelected(null); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Plan a space like this ↗</button>
       </motion.div>}
     </AnimatePresence>
-    <div className="model-caption"><span>01 / CONCEPT VILLA</span><span>INTERACTIVE STUDY</span></div>
+    <p className="model-credit">3D model: <a href="https://sketchfab.com/3d-models/modern-coastal-hillside-villa-7aa1124e2f0a4013a16f61404deb8259" target="_blank" rel="noreferrer">“Modern Coastal Hillside Villa”</a> by <a href="https://sketchfab.com/visthetique" target="_blank" rel="noreferrer">Visthétique</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>
   </div>;
-}
-
-function ModelErrorBoundary({ children, onFail }: { children: React.ReactNode; onFail: () => void }) {
-  // The public model file is added after the downloaded asset is checked.
-  // Until then, the scene can be switched to the built-in demonstration villa.
-  try { return <Suspense fallback={null}>{children}</Suspense>; } catch { onFail(); return <ModelFallback />; }
 }
 
 const projects = [
