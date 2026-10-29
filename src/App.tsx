@@ -8,6 +8,8 @@ type SketchfabApi = {
   getCameraLookAt: (callback: (error: unknown, camera: CameraPose | null) => void) => void;
   setCameraLookAt: (position: [number, number, number], target: [number, number, number], duration?: number, callback?: (error: unknown) => void) => void;
   setCameraEasing: (easing: string) => void;
+  setTextureQuality: (quality: 'ld' | 'sd' | 'hd', callback?: (error: unknown) => void) => void;
+  setFov: (angle: number, callback?: (error: unknown, angle?: number) => void) => void;
   setUserInteraction: (enabled: boolean, callback?: (error: unknown) => void) => void;
   recenterCamera: (callback?: (error: unknown) => void) => void;
 };
@@ -23,12 +25,12 @@ declare global {
     };
   }
 }
-type Room = { id: string; label: string; note: string; position: [number, number, number]; target: [number, number, number] };
-const rooms: Room[] = [
-  { id: 'living', label: 'Living space', note: 'A closer look at the villa’s open living area and its connection to the landscape.', position: [-4, 53, -28], target: [-19, 45, -47] },
-  { id: 'kitchen', label: 'Kitchen', note: 'Move towards the kitchen zone and its material details.', position: [-39, 53, -53], target: [-54, 45, -71] },
-  { id: 'terrace', label: 'Terrace', note: 'Explore the outdoor dining and terrace setting.', position: [-5, 52, -97], target: [-29, 43, -78] },
-  { id: 'stairs', label: 'Staircase', note: 'Focus on the stair and the vertical connection between spaces.', position: [22, 58, -3], target: [10, 50, -15] },
+type ViewPreset = { id: string; label: string; factor: number; note: string };
+const views: ViewPreset[] = [
+  { id: 'wide', label: 'Exterior', factor: 1, note: 'Wide exterior view. Drag the model to orbit and explore.' },
+  { id: 'approach', label: 'Approach', factor: 0.78, note: 'Closer view of the architecture. Drag to aim at the area you want to inspect.' },
+  { id: 'detail', label: 'Detail view', factor: 0.58, note: 'Closer inspection view. Use drag and zoom to frame a particular space.' },
+  { id: 'close', label: 'Close-up', factor: 0.42, note: 'Close-up view. Move the camera manually to the room or detail you want.' },
 ];
 
 function HouseExperience() {
@@ -37,7 +39,7 @@ function HouseExperience() {
   const homePoseRef = useRef<CameraPose | null>(null);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [selected, setSelected] = useState<Room | null>(null);
+  const [selected, setSelected] = useState<ViewPreset | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +57,8 @@ function HouseExperience() {
           if (cancelled) return;
           apiRef.current = api;
           api.setCameraEasing('easeInOutCubic');
+          api.setTextureQuality('hd');
+          api.setFov(38);
           api.start();
           api.addEventListener('viewerready', () => {
             if (cancelled) return;
@@ -82,17 +86,27 @@ function HouseExperience() {
     return () => { cancelled = true; };
   }, []);
 
-  const returnOutside = () => {
+  const goToView = (view: ViewPreset) => {
     const api = apiRef.current;
-    const home = homePoseRef.current;
-    setSelected(null);
+    setSelected(view.id === 'wide' ? null : view);
     if (!api) return;
-    if (home) api.setCameraLookAt(home.position, home.target, 2.2);
-    else api.recenterCamera();
-  };
-  const explore = (room: Room) => {
-    setSelected(room);
-    apiRef.current?.setCameraLookAt(room.position, room.target, 2.8);
+    if (view.factor === 1) {
+      const home = homePoseRef.current;
+      if (home) api.setCameraLookAt(home.position, home.target, 1.8);
+      else api.recenterCamera();
+      return;
+    }
+    api.getCameraLookAt((error, camera) => {
+      if (error || !camera) return;
+      const p = camera.position;
+      const t = camera.target;
+      const dx = p[0] - t[0], dy = p[1] - t[1], dz = p[2] - t[2];
+      const currentDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const minDistance = Math.max(currentDistance * view.factor, currentDistance * 0.35);
+      const ratio = minDistance / Math.max(currentDistance, 0.001);
+      const next: [number, number, number] = [t[0] + dx * ratio, t[1] + dy * ratio, t[2] + dz * ratio];
+      api.setCameraLookAt(next, t, 2.4);
+    });
   };
 
   return <div className="house-stage">
@@ -106,18 +120,15 @@ function HouseExperience() {
       />
       {!ready && !loadError && <div className="viewer-loading"><span className="loading-mark" />Loading the interactive villa…</div>}
       {loadError && <div className="viewer-error">The 3D viewer could not load. <a href="https://sketchfab.com/3d-models/modern-coastal-hillside-villa-7aa1124e2f0a4013a16f61404deb8259" target="_blank" rel="noreferrer">Open the villa on Sketchfab ↗</a></div>}
-      <div className="stage-hint"><span className="hint-dot" /> Drag to orbit · use the room controls below</div>
+      <div className="stage-hint"><span className="hint-dot" /> Drag to orbit · zoom with scroll or pinch</div>
       <div className="model-caption"><span>01 / MODERN COASTAL HILLSIDE VILLA</span><span>INTERACTIVE 3D</span></div>
     </div>
-    <div className="room-controls" aria-label="Explore areas of the villa">
-      <button className={!selected ? 'room-control active' : 'room-control'} onClick={returnOutside}><span>00</span> Exterior <i>↗</i></button>
-      {rooms.map((room, index) => <button key={room.id} className={selected?.id === room.id ? 'room-control active' : 'room-control'} onClick={() => explore(room)}><span>{String(index + 1).padStart(2, '0')}</span>{room.label}<i>↗</i></button>)}
+    <div className="room-controls" aria-label="Camera distance presets">
+      {views.map((view, index) => <button key={view.id} className={(!selected && index === 0) || selected?.id === view.id ? 'room-control active' : 'room-control'} onClick={() => goToView(view)}><span>{String(index).padStart(2, '0')}</span>{view.label}<i>↗</i></button>)}
     </div>
     <AnimatePresence>
       {selected && <motion.div className="room-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}>
-        <button className="room-close" onClick={() => setSelected(null)} aria-label="Close room details">×</button>
-        <p className="eyebrow">EXPLORE THE DESIGN</p><h3>{selected.label}</h3><p>{selected.note}</p>
-        <button className="text-link" onClick={() => { setSelected(null); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Plan a space like this ↗</button>
+        <p className="eyebrow">CAMERA PRESET</p><h3>{selected.label}</h3><p>{selected.note}</p>
       </motion.div>}
     </AnimatePresence>
     <p className="model-credit">3D model: <a href="https://sketchfab.com/3d-models/modern-coastal-hillside-villa-7aa1124e2f0a4013a16f61404deb8259" target="_blank" rel="noreferrer">“Modern Coastal Hillside Villa”</a> by <a href="https://sketchfab.com/visthetique" target="_blank" rel="noreferrer">Visthétique</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.</p>
