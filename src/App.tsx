@@ -81,7 +81,7 @@ function ModelErrorBoundary({ children, onFail }: { children: React.ReactNode; o
 const projects = [
   { number: '01', name: 'The Ridge House', type: 'Residential · Concept study', image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=85', size: 'large' },
   { number: '02', name: 'Courtyard Living', type: 'Residential · Spatial design', image: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1000&q=85', size: 'small' },
-  { number: '03', name: 'Quiet Geometry', type: 'Interiors · Material study', image: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1000&q=85', size: 'small' },
+  { number: '03', name: 'Lines of Living', type: 'Architecture · Plan study', image: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1000&q=85', size: 'small' },
 ];
 const services = [
   ['01', 'Architecture & planning', 'From the first sketch to a considered, buildable design.'],
@@ -100,7 +100,7 @@ export default function App() {
   const mailBody = encodeURIComponent('Hello Consultium,\n\nI would like to discuss a project.\nProject type: ' + projectType + '\nIndicative budget: ' + budget + '\nName: ' + contactForm.name + '\nEmail: ' + contactForm.email + '\nProject details: ' + contactForm.details);
   return <main>
     <header className="topbar">
-      <a href="#top" className="wordmark" aria-label="Consultium home">CONSULTIUM<span>®</span><small>ARCHITECTURE · SPATIAL DESIGN</small></a>
+      <a href="#top" className="wordmark" aria-label="Consultium home"><span className="brand-main">CONSULTIUM</span><span className="brand-blocks" aria-hidden="true"><i></i><i></i><i></i><i></i></span><small>ARCHITECTS &amp; URBAN DESIGNERS</small></a>
       <nav className={menuOpen ? 'nav-links open' : 'nav-links'}>
         <a href="#work" onClick={() => setMenuOpen(false)}>Selected work</a><a href="#approach" onClick={() => setMenuOpen(false)}>Approach</a><a href="#services" onClick={() => setMenuOpen(false)}>Services</a>
         <a className="nav-contact" href="#contact" onClick={() => setMenuOpen(false)}>Start a project <span>↗</span></a>
@@ -153,6 +153,6 @@ export default function App() {
     </section>
     <section className="contact section-pad" id="contact"><div className="section-label"><span>06 / START A CONVERSATION</span><span>YOUR PROJECT STARTS HERE</span></div><div className="contact-grid"><div><p className="eyebrow">HAVE SOMETHING IN MIND?</p><h2>Let's make<br /><em>space for it.</em></h2><p className="contact-copy">Tell us a little about your idea. We'll help you work out a thoughtful next step.</p><div className="contact-aside"><span>CONSULTIUM</span><span>Architecture · Spatial design</span><span>Contact details to be confirmed by the studio.</span></div></div>
       <form className="contact-form" onSubmit={submit}><label>Your name<input required value={contactForm.name} onChange={e=>setContactForm({...contactForm,name:e.target.value})} placeholder="Name" /></label><label>Email address<input type="email" required value={contactForm.email} onChange={e=>setContactForm({...contactForm,email:e.target.value})} placeholder="you@example.com" /></label><label>Tell us about the project<textarea rows={4} value={contactForm.details} onChange={e=>setContactForm({...contactForm,details:e.target.value})} placeholder="Site, ideas, timeline, questions..." /></label><button className="button button-dark" type="submit">Prepare enquiry <span>↗</span></button>{submitted && <div className="form-success">Your enquiry is ready. <a href={'mailto:?subject='+encodeURIComponent('Consultium project enquiry')+'&body='+mailBody}>Open in your email app ↗</a><p>We haven't sent anything automatically; your email app will let you review and send it.</p></div>}</form></div></section>
-    <footer className="footer"><a href="#top" className="wordmark">CONSULTIUM<span>®</span><small>ARCHITECTURE · SPATIAL DESIGN</small></a><p>Thoughtful spaces. Lasting impact.</p><div><a href="#work">Work</a><a href="#services">Services</a><a href="#contact">Contact</a></div><span>© {new Date().getFullYear()} CONSULTIUM · CONCEPT WEBSITE</span></footer>
+    <footer className="footer"><a href="#top" className="wordmark" aria-label="Consultium home"><span className="brand-main">CONSULTIUM</span><span className="brand-blocks" aria-hidden="true"><i></i><i></i><i></i><i></i></span><small>ARCHITECTS &amp; URBAN DESIGNERS</small></a><p>Thoughtful spaces. Lasting impact.</p><div><a href="#work">Work</a><a href="#services">Services</a><a href="#contact">Contact</a></div><span>© {new Date().getFullYear()} CONSULTIUM · CONCEPT WEBSITE</span></footer>
   </main>;
 }
